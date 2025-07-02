@@ -26,6 +26,7 @@ ui <- dashboardPage(
       background-attachment: fixed;
       background-position: center;
       font-family: 'Segoe UI', sans-serif;
+      text-align: justify;
     }
 
     .home-box, .box {
@@ -181,9 +182,7 @@ ui <- dashboardPage(
             ),
             tags$hr(),
             h4("Uji Shapiro-Wilk Residual"),
-            verbatimTextOutput("shapiro_test"),
-            verbatimTextOutput("shapiro_interpretasi")
-            
+            verbatimTextOutput("shapiro_test")
           ),
           box(
             title = tagList(icon("wave-square"), "Residual vs Index (Independensi)"),
@@ -191,7 +190,17 @@ ui <- dashboardPage(
             solidHeader = TRUE,
             status = "primary",
             plotOutput("resid_vs_index")
+          ),
+          box(
+            title = tagList(icon("balance-scale"), "Uji Homoskedastisitas (Breusch-Pagan Test)"),
+            width = 12,
+            solidHeader = TRUE,
+            status = "primary",
+            verbatimTextOutput("bp_test"),
+            tags$p("H0: Tidak terdapat heteroskedastisitas (varian residual konstan)."),
+            tags$p("Jika p-value < 0.05, maka tolak H0: ada indikasi heteroskedastisitas.")
           )
+          
         )
       )
     )
@@ -199,6 +208,7 @@ ui <- dashboardPage(
 )
 
 server <- function(input, output, session) {
+  library(lmtest)
   
   values <- reactiveValues(
     data = NULL,
@@ -321,28 +331,24 @@ server <- function(input, output, session) {
     shapiro.test(res)
   })
   
-  output$shapiro_interpretasi <- renderPrint({
-    req(values$model)
-    res <- resid(values$model)
-    shapiro <- shapiro.test(res)
-    pval <- shapiro$p.value
-    
-    if (pval < 0.05) {
-      cat("Interpretasi: p-value =", round(pval,4), 
-          "\nResidual tidak berdistribusi normal (tolak H0).")
-    } else {
-      cat("Interpretasi: p-value =", round(pval,4),
-          "\nResidual berdistribusi normal (gagal tolak H0).")
-    }
-  })
-  
   output$resid_vs_index <- renderPlot({
     req(values$model)
     plot(resid(values$model), type = "b", pch = 19, col = "darkgreen",
          ylab = "Residual", xlab = "Index", main = "Residual vs Index")
     abline(h = 0, lty = 2)
   })
+  output$bp_test <- renderPrint({
+    req(values$model)
+    test <- bptest(values$model)
+    print(test)
+    cat("\nInterpretasi:\n")
+    if (test$p.value < 0.05) {
+      cat("Terdapat indikasi heteroskedastisitas (p-value < 0.05).\n")
+    } else {
+      cat("Tidak terdapat indikasi heteroskedastisitas (p-value ≥ 0.05).\n")
+    }
+  })
+  
 }
-
 
 shinyApp(ui, server)
